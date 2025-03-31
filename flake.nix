@@ -1,9 +1,5 @@
 {
   inputs = {
-    nix-go = {
-      inputs.nixpkgs.follows = "nixpkgs";
-      url = "github:matthewdargan/nix-go";
-    };
     nixpkgs.url = "nixpkgs/nixos-unstable";
     parts.url = "github:hercules-ci/flake-parts";
     pre-commit-hooks = {
@@ -16,45 +12,55 @@
       imports = [inputs.pre-commit-hooks.flakeModule];
       perSystem = {
         config,
-        inputs',
         lib,
         pkgs,
         ...
       }: {
         devShells.default = pkgs.mkShell {
-          packages = [
-            inputs'.nix-go.packages.go
-            inputs'.nix-go.packages.golangci-lint
-            pkgs.ffmpeg-full
+          buildInputs = [
+            pkgs.boost
+            pkgs.curl
+            pkgs.libtorrent-rasterbar
+            pkgs.libxml2
+            pkgs.pkg-config
           ];
+          packages = [pkgs.clang pkgs.gdb pkgs.libllvm pkgs.valgrind];
           shellHook = "${config.pre-commit.installationScript}";
         };
-        packages.media-server = inputs'.nix-go.legacyPackages.buildGoModule {
+        packages.mooch = pkgs.clangStdenv.mkDerivation {
+          buildInputs = [
+            pkgs.boost
+            pkgs.curl
+            pkgs.libtorrent-rasterbar
+            pkgs.libxml2
+            pkgs.pkg-config
+          ];
+          buildPhase = "./build.sh release mooch";
+          installPhase = ''
+            mkdir -p "$out/bin"
+            cp ./build/mooch "$out/bin"
+          '';
           meta = with lib; {
-            description = "Simple media server";
-            homepage = "https://github.com/matthewdargan/media-server";
+            description = "Queries and downloads torrents";
+            homepage = "https://github.com/matthewdargan/mooch";
             license = licenses.bsd3;
             maintainers = with maintainers; [matthewdargan];
           };
-          pname = "media-server";
+          nativeBuildInputs = [pkgs.pkg-config];
+          pname = "mooch";
           src = ./.;
-          vendorHash = null;
-          version = "0.1.0";
+          version = "0.5.6";
         };
         pre-commit = {
           check.enable = false;
           settings = {
             hooks = {
               alejandra.enable = true;
+              clang-format = {
+                enable = false;
+                types_or = lib.mkForce ["c" "c++"];
+              };
               deadnix.enable = true;
-              golangci-lint = {
-                enable = true;
-                package = inputs'.nix-go.packages.golangci-lint;
-              };
-              gotest = {
-                enable = true;
-                package = inputs'.nix-go.packages.go;
-              };
               statix.enable = true;
             };
             src = ./.;

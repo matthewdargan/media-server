@@ -1,0 +1,7 @@
+[
+  {
+    "directory": ".",
+    "command": "./build.sh mooch",
+    "file": "./src/mooch/main.cpp"
+  }
+]
