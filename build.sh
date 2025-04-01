@@ -2,9 +2,9 @@
 set -eu
 
 for arg in "$@"; do eval "$arg=1"; done
-if [ -z "${release:-}" ];   then debug=1; fi
-if [ -n "${debug:-}" ];     then echo '[debug mode]'; fi
-if [ -n "${release:-}" ];   then echo '[release mode]'; fi
+if [ -z "${release:-}" ]; then debug=1; fi
+if [ -n "${debug:-}" ];   then echo '[debug mode]'; fi
+if [ -n "${release:-}" ]; then echo '[release mode]'; fi
 
 compile_common='-I../src/ -g -fdiagnostics-absolute-paths -Wall -Xclang -flto-visibility-public-std'
 compile_debug="clang++ -g -O0 -DBUILD_DEBUG=1 ${compile_common}"
@@ -17,9 +17,9 @@ if [ -n "${release:-}" ]; then compile="$compile_release"; fi
 
 mkdir -p build
 
-# --- Build Everything (@build_targets) ---------------------------------------
 cd build
-if [ -n "${mooch:-}" ]; then didbuild=1 && $compile ../src/mooch/main.cpp $link_mooch $out mooch; fi
+if [ -n "${mooch:-}" ];    then didbuild=1 && $compile ../src/mooch/main.cpp $link_mooch $out mooch; fi
+if [ -n "${moochrss:-}" ]; then didbuild=1 && $compile ../src/moochrss/main.cpp $link_mooch $out moochrss; fi
 cd ..
 
 if [ -z "${didbuild:-}" ]
