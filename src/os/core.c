@@ -273,9 +273,8 @@ internal file_properties os_properties_from_file_path(arena *a, string8 path) {
 internal b32 os_make_directory(arena *a, string8 path) {
     temp scratch = temp_begin(a);
     string8 path_copy = push_str8_copy(scratch.a, path);
-    int mkdir_result = mkdir((char *)path_copy.str, 0755);
     b32 result = 0;
-    if (mkdir_result == 0) {
+    if (mkdir((char *)path_copy.str, 0755) != -1) {
         result = 1;
     }
     temp_end(scratch);

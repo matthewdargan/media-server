@@ -4,10 +4,13 @@ Moochrss queries RSS feeds and downloads torrents automatically.
 
 Usage:
 
-    moochrss [-f filter] [-c category] [-u user] [-s sort] [-o order] query
+    moochrss [-t top results] [-f filter] [-c category] [-u user] [-s sort] [-o order] query
 
 Moochrss queries torrents matching the specified criteria and adds them
 to a [libtorrent](https://www.libtorrent.org/index.html) session.
+
+The -t flag sets the maximum number of torrents to download. The value
+must be a positive integer. The default setting is 75.
 
 The -f flag sets the filter. Available options include: 0 (No filter),
 1 (No remakes), 2 (Trusted only). The default setting is 0.

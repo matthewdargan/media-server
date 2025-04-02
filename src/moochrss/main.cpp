@@ -21,6 +21,7 @@ global arena *g_arena = 0;
 
 typedef struct params params;
 struct params {
+    u64 top_results;
     u8 filter;
     string8 category;
     string8 user;
@@ -61,50 +62,54 @@ read_only global string8 sorts[] = {
 read_only global string8 orders[] = {str8_lit("asc"), str8_lit("desc")};
 
 internal b32 validate_params(params ps) {
-    b32 valid = 0;
+    if (ps.top_results <= 0 || ps.top_results > MAX_TORRENTS) {
+        fprintf(stderr, "invalid top results: %lu\n", ps.top_results);
+        return 0;
+    }
+    b32 filter_valid = 0;
     for (u64 i = 0; i < ARRAY_COUNT(filters); ++i) {
         if (ps.filter == filters[i]) {
-            valid = 1;
+            filter_valid = 1;
             break;
         }
     }
-    if (!valid) {
+    if (!filter_valid) {
         fprintf(stderr, "invalid filter: %c\n", ps.filter);
         return 0;
     }
-    valid = 0;
+    b32 category_valid = 0;
     for (u64 i = 0; i < ARRAY_COUNT(categories); ++i) {
         if (str8_match(ps.category, categories[i], 0)) {
-            valid = 1;
+            category_valid = 1;
             break;
         }
     }
-    if (!valid) {
+    if (!category_valid) {
         fprintf(stderr, "invalid category: %s\n", ps.category.str);
         return 0;
     }
     if (ps.sort.size > 0) {
-        valid = 0;
+        b32 sort_valid = 0;
         for (u64 i = 0; i < ARRAY_COUNT(sorts); ++i) {
             if (str8_match(ps.sort, sorts[i], 0)) {
-                valid = 1;
+                sort_valid = 1;
                 break;
             }
         }
-        if (!valid) {
+        if (!sort_valid) {
             fprintf(stderr, "invalid sort: %s\n", ps.sort.str);
             return 0;
         }
     }
     if (ps.order.size > 0) {
-        valid = 0;
+        b32 order_valid = 0;
         for (u64 i = 0; i < ARRAY_COUNT(orders); ++i) {
             if (str8_match(ps.order, orders[i], 0)) {
-                valid = 1;
+                order_valid = 1;
                 break;
             }
         }
-        if (!valid) {
+        if (!order_valid) {
             fprintf(stderr, "invalid order: %s\n", ps.order.str);
             return 0;
         }
@@ -203,8 +208,8 @@ internal torrent_array get_torrents(arena *a, params ps) {
         curl_easy_cleanup(curl);
         return torrents;
     }
-    torrents.v = push_array_no_zero(a, torrent, MAX_TORRENTS);
-    for (xmlNodePtr item = channel->children; item != NULL; item = item->next) {
+    torrents.v = push_array_no_zero(a, torrent, ps.top_results);
+    for (xmlNodePtr item = channel->children; item != NULL && torrents.count < ps.top_results; item = item->next) {
         if (item->type == XML_ELEMENT_NODE && xmlStrcmp(item->name, BAD_CAST "item") == 0) {
             for (xmlNodePtr node = item->children; node != NULL; node = node->next) {
                 if (node->type == XML_ELEMENT_NODE && xmlStrcmp(node->name, BAD_CAST "link") == 0) {
@@ -226,6 +231,16 @@ internal void download_torrents(torrent_array torrents) {
     if (torrents.count == 0) {
         return;
     }
+    char *home = getenv("HOME");
+    string8 config_path = push_str8_cat(g_arena, str8_cstring(home), str8_lit("/.config/moochrss"));
+    if (!os_folder_path_exists(g_arena, config_path)) {
+        os_make_directory(g_arena, config_path);
+    }
+    string8 history_path = push_str8_cat(g_arena, config_path, str8_lit("/history"));
+    string8 history_data = str8_zero();
+    if (os_file_path_exists(g_arena, history_path)) {
+        history_data = os_data_from_file_path(g_arena, history_path);
+    }
     libtorrent::settings_pack pack;
     pack.set_int(libtorrent::settings_pack::alert_mask,
                  libtorrent::alert::status_notification | libtorrent::alert::error_notification);
@@ -238,7 +253,15 @@ internal void download_torrents(torrent_array torrents) {
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "mooch/1.0");
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     string8 temp_path = str8_lit("/tmp/mooch.torrent");
+    string8 torrents_to_download = str8_zero();
+    u64 to_download = 0;
     for (u64 i = 0; i < torrents.count; ++i) {
+        if (history_data.size > 0) {
+            if (str8_find_needle(history_data, 0, torrents.v[i].link, 0) != history_data.size) {
+                printf("mooch: already downloaded %s\n", torrents.v[i].link.str);
+                continue;
+            }
+        }
         FILE *fp = fopen((const char *)temp_path.str, "wb");
         if (fp == NULL) {
             fprintf(stderr, "mooch: could not write to temporary file: %s\n", temp_path.str);
@@ -267,9 +290,17 @@ internal void download_torrents(torrent_array torrents) {
         }
         ps.save_path = ".";
         session.add_torrent(ps);
+        string8 torrent_nl = push_str8_cat(g_arena, torrents.v[i].link, str8_lit("\n"));
+        torrents_to_download = push_str8_cat(g_arena, torrents_to_download, torrent_nl);
+        ++to_download;
     }
     unlink((const char *)temp_path.str);
     curl_easy_cleanup(curl);
+    if (to_download == 0) {
+        fprintf(stderr, "mooch: no torrents to download\n");
+        return;
+    }
+    os_append_data_to_file_path(g_arena, history_path, torrents_to_download);
     time_t last_update = time(0);
     for (b32 all_done = 0; !all_done;) {
         time_t now = time(0);
@@ -306,7 +337,7 @@ internal void download_torrents(torrent_array torrents) {
         }
         os_sleep_milliseconds(100);
     }
-    printf("mooch: downloads complete\n");
+    printf("mooch: downloaded %lu torrents\n", to_download);
 }
 
 internal void *arena_malloc_callback(u64 size) {
@@ -348,11 +379,15 @@ int main(int argc, char *argv[]) {
                                          .reserve_size = arena_default_reserve_size,
                                          .commit_size = arena_default_commit_size});
     params ps = {
+        .top_results = MAX_TORRENTS,
         .filter = '0',
         .category = str8_lit("0_0"),
     };
-    for (int ch = 0; (ch = getopt(argc, argv, "f:c:u:s:o:")) != -1;) {
+    for (int ch = 0; (ch = getopt(argc, argv, "t:f:c:u:s:o:")) != -1;) {
         switch (ch) {
+            case 't':
+                ps.top_results = u64_from_str8(str8_cstring(optarg), 10);
+                break;
             case 'f':
                 ps.filter = optarg[0];
                 break;
