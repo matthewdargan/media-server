@@ -17,8 +17,6 @@
 #define CHUNK_SIZE MB(1)
 #define RESULTS_PER_PAGE 75
 
-global arena *g_arena = 0;
-
 typedef struct params params;
 struct params {
     u8 filter;
@@ -408,10 +406,8 @@ internal void *arena_calloc_callback(u64 nmemb, u64 size) {
     return ptr;
 }
 
-int main(int argc, char *argv[]) {
-    g_arena = arena_alloc((arena_params){.flags = arena_default_flags,
-                                         .reserve_size = arena_default_reserve_size,
-                                         .commit_size = arena_default_commit_size});
+int entry_point(int argc, char **argv) {
+    temp scratch = temp_begin(g_arena);
     params ps = {
         .filter = '0',
         .category = str8_lit("0_0"),
@@ -422,16 +418,16 @@ int main(int argc, char *argv[]) {
                 ps.filter = optarg[0];
                 break;
             case 'c':
-                ps.category = push_str8_copy(g_arena, str8_cstring(optarg));
+                ps.category = push_str8_copy(scratch.a, str8_cstring(optarg));
                 break;
             case 'u':
-                ps.user = push_str8_copy(g_arena, str8_cstring(optarg));
+                ps.user = push_str8_copy(scratch.a, str8_cstring(optarg));
                 break;
             case 's':
-                ps.sort = push_str8_copy(g_arena, str8_cstring(optarg));
+                ps.sort = push_str8_copy(scratch.a, str8_cstring(optarg));
                 break;
             case 'o':
-                ps.order = push_str8_copy(g_arena, str8_cstring(optarg));
+                ps.order = push_str8_copy(scratch.a, str8_cstring(optarg));
                 break;
             default:
                 usage();
@@ -440,7 +436,7 @@ int main(int argc, char *argv[]) {
     if (optind >= argc) {
         usage();
     }
-    ps.query = push_str8_copy(g_arena, str8_cstring(argv[optind]));
+    ps.query = push_str8_copy(scratch.a, str8_cstring(argv[optind]));
     if (!validate_params(ps)) {
         return 1;
     }
@@ -448,36 +444,36 @@ int main(int argc, char *argv[]) {
                          arena_strdup_callback, arena_calloc_callback);
     xmlMemSetup(arena_free_callback, arena_malloc_callback, arena_realloc_callback, arena_strdup_callback);
     xmlInitParser();
-    string8 temp_path = push_str8_cat(g_arena, str8_lit("/tmp/mooch-"), str8_from_u64(g_arena, os_now_microseconds(), 10, 0, 0));
+    string8 temp_path = push_str8_cat(scratch.a, str8_lit("/tmp/mooch-"), str8_from_u64(scratch.a, os_now_microseconds(), 10, 0, 0));
     string8 temp_data = str8_zero();
-    torrent_array torrents = get_torrents(g_arena, ps);
+    torrent_array torrents = get_torrents(scratch.a, ps);
     torrent_array selected_torrents = {0};
     if (torrents.count == 0) {
         fprintf(stderr, "mooch: no torrents found\n");
         goto cleanup;
     }
     for (u64 i = 0; i < torrents.count; ++i) {
-        string8 line = push_str8_cat(g_arena, torrents.v[i].title, str8_lit(" "));
-        line = push_str8_cat(g_arena, line, torrents.v[i].magnet);
-        line = push_str8_cat(g_arena, line, str8_lit("\n"));
-        temp_data = push_str8_cat(g_arena, temp_data, line);
+        string8 line = push_str8_cat(scratch.a, torrents.v[i].title, str8_lit(" "));
+        line = push_str8_cat(scratch.a, line, torrents.v[i].magnet);
+        line = push_str8_cat(scratch.a, line, str8_lit("\n"));
+        temp_data = push_str8_cat(scratch.a, temp_data, line);
     }
-    if (!os_append_data_to_file_path(g_arena, temp_path, temp_data)) {
+    if (!os_append_data_to_file_path(temp_path, temp_data)) {
         fprintf(stderr, "mooch: could not write to temporary file: %s\n", temp_path.str);
         goto cleanup;
     }
-    run_editor(g_arena, temp_path);
-    selected_torrents = process_selected_torrents(g_arena, temp_path);
+    run_editor(scratch.a, temp_path);
+    selected_torrents = process_selected_torrents(scratch.a, temp_path);
     if (selected_torrents.count == 0) {
         fprintf(stderr, "mooch: no torrents selected\n");
         goto cleanup;
     }
-    os_delete_file_at_path(g_arena, temp_path);
+    os_delete_file_at_path(temp_path);
     download_torrents(selected_torrents);
 
 cleanup:
     xmlCleanupParser();
     curl_global_cleanup();
-    arena_release(g_arena);
+    temp_end(scratch);
     return 0;
 }

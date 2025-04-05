@@ -8,5 +8,10 @@
     "directory": ".",
     "command": "./build.sh moochrss",
     "file": "./src/moochrss/main.cpp"
+  },
+  {
+    "directory": ".",
+    "command": "./build.sh media",
+    "file": "./src/media/main.c"
   }
 ]

@@ -17,8 +17,6 @@
 #define CHUNK_SIZE MB(1)
 #define MAX_TORRENTS 75
 
-global arena *g_arena = 0;
-
 typedef struct params params;
 struct params {
     u64 top_results;
@@ -227,19 +225,19 @@ internal torrent_array get_torrents(arena *a, params ps) {
     return torrents;
 }
 
-internal void download_torrents(torrent_array torrents) {
+internal void download_torrents(arena *a, torrent_array torrents) {
     if (torrents.count == 0) {
         return;
     }
     char *home = getenv("HOME");
-    string8 config_path = push_str8_cat(g_arena, str8_cstring(home), str8_lit("/.config/moochrss"));
-    if (!os_folder_path_exists(g_arena, config_path)) {
-        os_make_directory(g_arena, config_path);
+    string8 config_path = push_str8_cat(a, str8_cstring(home), str8_lit("/.config/moochrss"));
+    if (!os_folder_path_exists(config_path)) {
+        os_make_directory(config_path);
     }
-    string8 history_path = push_str8_cat(g_arena, config_path, str8_lit("/history"));
+    string8 history_path = push_str8_cat(a, config_path, str8_lit("/history"));
     string8 history_data = str8_zero();
-    if (os_file_path_exists(g_arena, history_path)) {
-        history_data = os_data_from_file_path(g_arena, history_path);
+    if (os_file_path_exists(history_path)) {
+        history_data = os_data_from_file_path(a, history_path);
     }
     libtorrent::settings_pack pack;
     pack.set_int(libtorrent::settings_pack::alert_mask,
@@ -290,8 +288,8 @@ internal void download_torrents(torrent_array torrents) {
         }
         ps.save_path = ".";
         session.add_torrent(ps);
-        string8 torrent_nl = push_str8_cat(g_arena, torrents.v[i].link, str8_lit("\n"));
-        torrents_to_download = push_str8_cat(g_arena, torrents_to_download, torrent_nl);
+        string8 torrent_nl = push_str8_cat(a, torrents.v[i].link, str8_lit("\n"));
+        torrents_to_download = push_str8_cat(a, torrents_to_download, torrent_nl);
         ++to_download;
     }
     unlink((const char *)temp_path.str);
@@ -300,7 +298,7 @@ internal void download_torrents(torrent_array torrents) {
         fprintf(stderr, "mooch: no torrents to download\n");
         return;
     }
-    os_append_data_to_file_path(g_arena, history_path, torrents_to_download);
+    os_append_data_to_file_path(history_path, torrents_to_download);
     time_t last_update = time(0);
     for (b32 all_done = 0; !all_done;) {
         time_t now = time(0);
@@ -374,10 +372,8 @@ internal void *arena_calloc_callback(u64 nmemb, u64 size) {
     return ptr;
 }
 
-int main(int argc, char *argv[]) {
-    g_arena = arena_alloc((arena_params){.flags = arena_default_flags,
-                                         .reserve_size = arena_default_reserve_size,
-                                         .commit_size = arena_default_commit_size});
+int entry_point(int argc, char **argv) {
+    temp scratch = temp_begin(g_arena);
     params ps = {
         .top_results = MAX_TORRENTS,
         .filter = '0',
@@ -392,16 +388,16 @@ int main(int argc, char *argv[]) {
                 ps.filter = optarg[0];
                 break;
             case 'c':
-                ps.category = push_str8_copy(g_arena, str8_cstring(optarg));
+                ps.category = push_str8_copy(scratch.a, str8_cstring(optarg));
                 break;
             case 'u':
-                ps.user = push_str8_copy(g_arena, str8_cstring(optarg));
+                ps.user = push_str8_copy(scratch.a, str8_cstring(optarg));
                 break;
             case 's':
-                ps.sort = push_str8_copy(g_arena, str8_cstring(optarg));
+                ps.sort = push_str8_copy(scratch.a, str8_cstring(optarg));
                 break;
             case 'o':
-                ps.order = push_str8_copy(g_arena, str8_cstring(optarg));
+                ps.order = push_str8_copy(scratch.a, str8_cstring(optarg));
                 break;
             default:
                 usage();
@@ -410,7 +406,7 @@ int main(int argc, char *argv[]) {
     if (optind >= argc) {
         usage();
     }
-    ps.query = push_str8_copy(g_arena, str8_cstring(argv[optind]));
+    ps.query = push_str8_copy(scratch.a, str8_cstring(argv[optind]));
     if (!validate_params(ps)) {
         return 1;
     }
@@ -418,16 +414,16 @@ int main(int argc, char *argv[]) {
                          arena_strdup_callback, arena_calloc_callback);
     xmlMemSetup(arena_free_callback, arena_malloc_callback, arena_realloc_callback, arena_strdup_callback);
     xmlInitParser();
-    torrent_array torrents = get_torrents(g_arena, ps);
+    torrent_array torrents = get_torrents(scratch.a, ps);
     if (torrents.count == 0) {
         fprintf(stderr, "mooch: no torrents found\n");
         goto cleanup;
     }
-    download_torrents(torrents);
+    download_torrents(scratch.a, torrents);
 
 cleanup:
     xmlCleanupParser();
     curl_global_cleanup();
-    arena_release(g_arena);
+    temp_end(scratch);
     return 0;
 }

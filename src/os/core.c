@@ -1,14 +1,14 @@
 internal string8 os_data_from_file_path(arena *a, string8 path) {
-    os_handle file = os_file_open(a, O_RDONLY, path);
+    os_handle file = os_file_open(O_RDONLY, path);
     file_properties props = os_properties_from_file(file);
     string8 data = os_string_from_file_range(a, file, rng_1u64(0, props.size));
     os_file_close(file);
     return data;
 }
 
-internal b32 os_write_data_to_file_path(arena *a, string8 path, string8 data) {
+internal b32 os_write_data_to_file_path(string8 path, string8 data) {
     b32 good = 0;
-    os_handle file = os_file_open(a, O_WRONLY, path);
+    os_handle file = os_file_open(O_WRONLY, path);
     if (file != 0) {
         good = 1;
         os_file_write(file, rng_1u64(0, data.size), data.str);
@@ -17,10 +17,10 @@ internal b32 os_write_data_to_file_path(arena *a, string8 path, string8 data) {
     return good;
 }
 
-internal b32 os_append_data_to_file_path(arena *a, string8 path, string8 data) {
+internal b32 os_append_data_to_file_path(string8 path, string8 data) {
     b32 good = 0;
     if (data.size != 0) {
-        os_handle file = os_file_open(a, O_WRONLY | O_APPEND | O_CREAT, path);
+        os_handle file = os_file_open(O_WRONLY | O_APPEND | O_CREAT, path);
         if (file != 0) {
             good = 1;
             u64 pos = os_properties_from_file(file).size;
@@ -130,8 +130,8 @@ internal void *os_reserve_large(u64 size) {
     return result;
 }
 
-internal os_handle os_file_open(arena *a, int flags, string8 path) {
-    temp scratch = temp_begin(a);
+internal os_handle os_file_open(int flags, string8 path) {
+    temp scratch = temp_begin(g_arena);
     string8 path_copy = push_str8_copy(scratch.a, path);
     int fd = open((char *)path_copy.str, flags, 0755);
     os_handle handle = 0;
@@ -211,8 +211,8 @@ internal file_properties os_properties_from_file(os_handle file) {
     return props;
 }
 
-internal b32 os_delete_file_at_path(arena *a, string8 path) {
-    temp scratch = temp_begin(a);
+internal b32 os_delete_file_at_path(string8 path) {
+    temp scratch = temp_begin(g_arena);
     b32 result = 0;
     string8 path_copy = push_str8_copy(scratch.a, path);
     if (remove((char *)path_copy.str) != -1) {
@@ -222,18 +222,18 @@ internal b32 os_delete_file_at_path(arena *a, string8 path) {
     return result;
 }
 
-internal string8 os_full_path_from_path(arena *a, string8 path) {
-    temp scratch = temp_begin(a);
+internal string8 os_full_path_from_path(string8 path) {
+    temp scratch = temp_begin(g_arena);
     string8 path_copy = push_str8_copy(scratch.a, path);
     char buffer[PATH_MAX] = {0};
     realpath((char *)path_copy.str, buffer);
-    string8 result = push_str8_copy(a, str8_cstring(buffer));
+    string8 result = push_str8_copy(scratch.a, str8_cstring(buffer));
     temp_end(scratch);
     return result;
 }
 
-internal b32 os_file_path_exists(arena *a, string8 path) {
-    temp scratch = temp_begin(a);
+internal b32 os_file_path_exists(string8 path) {
+    temp scratch = temp_begin(g_arena);
     string8 path_copy = push_str8_copy(scratch.a, path);
     int access_result = access((char *)path_copy.str, F_OK);
     b32 result = 0;
@@ -244,8 +244,8 @@ internal b32 os_file_path_exists(arena *a, string8 path) {
     return result;
 }
 
-internal b32 os_folder_path_exists(arena *a, string8 path) {
-    temp scratch = temp_begin(a);
+internal b32 os_folder_path_exists(string8 path) {
+    temp scratch = temp_begin(g_arena);
     b32 exists = 0;
     string8 path_copy = push_str8_copy(scratch.a, path);
     DIR *handle = opendir((char *)path_copy.str);
@@ -257,8 +257,8 @@ internal b32 os_folder_path_exists(arena *a, string8 path) {
     return exists;
 }
 
-internal file_properties os_properties_from_file_path(arena *a, string8 path) {
-    temp scratch = temp_begin(a);
+internal file_properties os_properties_from_file_path(string8 path) {
+    temp scratch = temp_begin(g_arena);
     string8 path_copy = push_str8_copy(scratch.a, path);
     struct stat f_stat = {0};
     int stat_result = stat((char *)path_copy.str, &f_stat);
@@ -270,8 +270,8 @@ internal file_properties os_properties_from_file_path(arena *a, string8 path) {
     return props;
 }
 
-internal b32 os_make_directory(arena *a, string8 path) {
-    temp scratch = temp_begin(a);
+internal b32 os_make_directory(string8 path) {
+    temp scratch = temp_begin(g_arena);
     string8 path_copy = push_str8_copy(scratch.a, path);
     b32 result = 0;
     if (mkdir((char *)path_copy.str, 0755) != -1) {
@@ -323,4 +323,19 @@ internal date_time os_local_time_from_universal(date_time dt) {
 
 internal void os_sleep_milliseconds(u32 msec) {
     usleep(msec * THOUSAND(1));
+}
+
+int main(int argc, char **argv) {
+    {
+        os_info.logical_processor_count = (u32)sysconf(_SC_NPROCESSORS_ONLN);
+        os_info.page_size = (u64)sysconf(_SC_PAGESIZE);
+        os_info.large_page_size = MB(2);
+        os_info.allocation_granularity = MB(2);
+    }
+    g_arena = arena_alloc((arena_params){.flags = arena_default_flags,
+                                         .reserve_size = arena_default_reserve_size,
+                                         .commit_size = arena_default_commit_size});
+    int result = entry_point(argc, argv);
+    arena_release(g_arena);
+    return result;
 }
