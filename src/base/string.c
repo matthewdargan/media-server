@@ -6,6 +6,13 @@ internal b32 char_is_lower(u8 c) {
     return 'a' <= c && c <= 'z';
 }
 
+internal u8 char_to_lower(u8 c) {
+    if (char_is_upper(c)) {
+        c += ('a' - 'A');
+    }
+    return c;
+}
+
 internal u8 char_to_upper(u8 c) {
     if (char_is_lower(c)) {
         c += ('A' - 'a');
@@ -177,4 +184,83 @@ internal u64 u64_from_str8(string8 string, u32 radix) {
         }
     }
     return x;
+}
+
+internal string8 str8_from_u64(arena *a, u64 value, u32 radix, u8 min_digits, u8 digit_group_separator) {
+    string8 result = {0};
+    {
+        string8 prefix = {0};
+        switch (radix) {
+            case 16: {
+                prefix = str8_lit("0x");
+            } break;
+            case 8: {
+                prefix = str8_lit("0o");
+            } break;
+            case 2: {
+                prefix = str8_lit("0b");
+            } break;
+            default:
+                break;
+        }
+        u8 digit_group_size = 3;
+        switch (radix) {
+            default:
+                break;
+            case 2:
+            case 8:
+            case 16: {
+                digit_group_size = 4;
+            } break;
+        }
+        u64 needed_leading_0s = 0;
+        {
+            u64 needed_digits = 1;
+            {
+                u64 u64_reduce = value;
+                for (;;) {
+                    u64_reduce /= radix;
+                    if (u64_reduce == 0) {
+                        break;
+                    }
+                    ++needed_digits;
+                }
+            }
+            needed_leading_0s = (min_digits > needed_digits) ? min_digits - needed_digits : 0;
+            u64 needed_separators = 0;
+            if (digit_group_separator != 0) {
+                needed_separators = (needed_digits + needed_leading_0s) / digit_group_size;
+                if (needed_separators > 0 && (needed_digits + needed_leading_0s) % digit_group_size == 0) {
+                    --needed_separators;
+                }
+            }
+            result.size = prefix.size + needed_leading_0s + needed_separators + needed_digits;
+            result.str = push_array_no_zero(a, u8, result.size + 1);
+            result.str[result.size] = 0;
+        }
+        {
+            u64 u64_reduce = value;
+            u64 digits_until_separator = digit_group_size;
+            for (u64 i = 0; i < result.size; ++i) {
+                if (digits_until_separator == 0 && digit_group_separator != 0) {
+                    result.str[result.size - i - 1] = digit_group_separator;
+                    digits_until_separator = digit_group_size + 1;
+                } else {
+                    result.str[result.size - i - 1] = char_to_lower(integer_symbols[u64_reduce % radix]);
+                    u64_reduce /= radix;
+                }
+                --digits_until_separator;
+                if (u64_reduce == 0) {
+                    break;
+                }
+            }
+            for (u64 leading_0_idx = 0; leading_0_idx < needed_leading_0s; ++leading_0_idx) {
+                result.str[prefix.size + leading_0_idx] = '0';
+            }
+        }
+        if (prefix.size != 0) {
+            memcpy(result.str, prefix.str, prefix.size);
+        }
+    }
+    return result;
 }

@@ -19,6 +19,10 @@ enum {
     STRING_MATCH_FLAGS_RIGHT_SIDE_SLOPPY = 1 << 1,
 };
 
+read_only global u8 integer_symbols[16] = {
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F',
+};
+
 read_only global u8 integer_symbol_reverse[128] = {
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
@@ -31,6 +35,7 @@ read_only global u8 integer_symbol_reverse[128] = {
 
 internal b32 char_is_upper(u8 c);
 internal b32 char_is_lower(u8 c);
+internal u8 char_to_lower(u8 c);
 internal u8 char_to_upper(u8 c);
 internal u64 cstring8_length(u8 *c);
 
@@ -54,5 +59,6 @@ internal string8 push_str8_copy(arena *a, string8 s);
 internal string8 push_str8fv(arena *a, char *fmt, va_list args);
 internal string8 push_str8f(arena *a, char *fmt, ...);
 internal u64 u64_from_str8(string8 string, u32 radix);
+internal string8 str8_from_u64(arena *a, u64 value, u32 radix, u8 min_digits, u8 digit_group_separator);
 
 #endif  // STRING_H

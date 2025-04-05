@@ -3,5 +3,10 @@
     "directory": ".",
     "command": "./build.sh mooch",
     "file": "./src/mooch/main.cpp"
+  },
+  {
+    "directory": ".",
+    "command": "./build.sh moochrss",
+    "file": "./src/moochrss/main.cpp"
   }
 ]

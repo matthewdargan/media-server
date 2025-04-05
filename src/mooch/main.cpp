@@ -228,7 +228,8 @@ internal torrent_array get_torrents(arena *a, params ps) {
     xmlXPathCompExprPtr title_expr = xmlXPathCompile(BAD_CAST "./td[2]/a[last()]");
     xmlXPathCompExprPtr magnet_expr = xmlXPathCompile(BAD_CAST "./td[3]/a[2]/@href");
     for (u64 page = 1, total_pages = 1; page <= total_pages; ++page) {
-        string8 query_url = push_str8_cat(a, url, push_str8f(a, (char *)"&p=%zu", page));
+        string8 query_url = push_str8_cat(a, url, str8_lit("&p="));
+        query_url = push_str8_cat(a, query_url, str8_from_u64(a, page, 10, 0, 0));
         chunk.size = 0;
         curl_easy_setopt(curl, CURLOPT_URL, query_url.str);
         CURLcode res = curl_easy_perform(curl);
@@ -267,7 +268,8 @@ internal void run_editor(arena *a, string8 path) {
     if (editor == NULL || strlen(editor) == 0) {
         editor = (char *)"vi";
     }
-    string8 cmd = push_str8f(a, (char *)"%s %s", editor, path.str);
+    string8 cmd = push_str8_cat(a, str8_cstring(editor), str8_lit(" "));
+    cmd = push_str8_cat(a, cmd, path);
     int status = system((char *)cmd.str);
     if (status != 0) {
         fprintf(stderr, "mooch: editor command failed with status %d\n", status);
@@ -446,7 +448,7 @@ int main(int argc, char *argv[]) {
                          arena_strdup_callback, arena_calloc_callback);
     xmlMemSetup(arena_free_callback, arena_malloc_callback, arena_realloc_callback, arena_strdup_callback);
     xmlInitParser();
-    string8 temp_path = push_str8f(g_arena, (char *)"/tmp/mooch-%llu", os_now_microseconds());
+    string8 temp_path = push_str8_cat(g_arena, str8_lit("/tmp/mooch-"), str8_from_u64(g_arena, os_now_microseconds(), 10, 0, 0));
     string8 temp_data = str8_zero();
     torrent_array torrents = get_torrents(g_arena, ps);
     torrent_array selected_torrents = {0};
@@ -455,9 +457,10 @@ int main(int argc, char *argv[]) {
         goto cleanup;
     }
     for (u64 i = 0; i < torrents.count; ++i) {
-        temp_data =
-            push_str8_cat(g_arena, temp_data,
-                          push_str8f(g_arena, (char *)"%s %s\n", torrents.v[i].title.str, torrents.v[i].magnet.str));
+        string8 line = push_str8_cat(g_arena, torrents.v[i].title, str8_lit(" "));
+        line = push_str8_cat(g_arena, line, torrents.v[i].magnet);
+        line = push_str8_cat(g_arena, line, str8_lit("\n"));
+        temp_data = push_str8_cat(g_arena, temp_data, line);
     }
     if (!os_append_data_to_file_path(g_arena, temp_path, temp_data)) {
         fprintf(stderr, "mooch: could not write to temporary file: %s\n", temp_path.str);
