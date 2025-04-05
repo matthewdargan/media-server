@@ -55,21 +55,6 @@ internal u64 dim_1u64(rng1u64 r) {
     return r.max > r.min ? (r.max - r.min) : 0;
 }
 
-internal string8 str8_substr(string8 str, rng1u64 range) {
-    range.min = MIN(range.min, str.size);
-    range.max = MIN(range.max, str.size);
-    str.str += range.min;
-    str.size = dim_1u64(range);
-    return str;
-}
-
-internal string8 str8_skip(string8 str, u64 amt) {
-    amt = MIN(amt, str.size);
-    str.str += amt;
-    str.size -= amt;
-    return str;
-}
-
 internal b32 str8_match(string8 a, string8 b, string_match_flags flags) {
     b32 result = 0;
     if (a.size == b.size && flags == 0) {
@@ -137,6 +122,33 @@ internal u64 str8_find_needle_reverse(string8 string, u64 start_pos, string8 nee
     return result;
 }
 
+internal string8 str8_substr(string8 str, rng1u64 range) {
+    range.min = MIN(range.min, str.size);
+    range.max = MIN(range.max, str.size);
+    str.str += range.min;
+    str.size = dim_1u64(range);
+    return str;
+}
+
+internal string8 str8_prefix(string8 str, u64 size) {
+    str.size = MIN(size, str.size);
+    return str;
+}
+
+internal string8 str8_skip(string8 str, u64 amt) {
+    amt = MIN(amt, str.size);
+    str.str += amt;
+    str.size -= amt;
+    return str;
+}
+
+internal string8 str8_postfix(string8 str, u64 size) {
+    size = MIN(size, str.size);
+    str.str = str.str + str.size - size;
+    str.size = size;
+    return str;
+}
+
 internal string8 push_str8_cat(arena *a, string8 s1, string8 s2) {
     string8 str;
     str.size = s1.size + s2.size;
@@ -175,6 +187,23 @@ internal string8 push_str8f(arena *a, char *fmt, ...) {
     return result;
 }
 
+internal b32 str8_is_integer(string8 string, u32 radix) {
+    b32 result = 0;
+    if (string.size > 0) {
+        if (1 < radix && radix <= 16) {
+            result = 1;
+            for (u64 i = 0; i < string.size; ++i) {
+                u8 c = string.str[i];
+                if (!(c < 0x80) || integer_symbol_reverse[c] >= radix) {
+                    result = 0;
+                    break;
+                }
+            }
+        }
+    }
+    return result;
+}
+
 internal u64 u64_from_str8(string8 string, u32 radix) {
     u64 x = 0;
     if (1 < radix && radix <= 16) {
@@ -184,6 +213,30 @@ internal u64 u64_from_str8(string8 string, u32 radix) {
         }
     }
     return x;
+}
+
+internal b32 try_u64_from_str8_c_rules(string8 string, u64 *x) {
+    b32 is_integer = 0;
+    if (str8_is_integer(string, 10)) {
+        is_integer = 1;
+        *x = u64_from_str8(string, 10);
+    } else {
+        string8 hex_string = str8_skip(string, 2);
+        if (str8_match(str8_prefix(string, 2), str8_lit("0x"), 0) && str8_is_integer(hex_string, 0x10)) {
+            is_integer = 1;
+            *x = u64_from_str8(hex_string, 0x10);
+        } else if (str8_match(str8_prefix(string, 2), str8_lit("0b"), 0) && str8_is_integer(hex_string, 2)) {
+            is_integer = 1;
+            *x = u64_from_str8(hex_string, 2);
+        } else {
+            string8 oct_string = str8_skip(string, 1);
+            if (str8_match(str8_prefix(string, 1), str8_lit("0"), 0) && str8_is_integer(hex_string, 010)) {
+                is_integer = 1;
+                *x = u64_from_str8(oct_string, 010);
+            }
+        }
+    }
+    return is_integer;
 }
 
 internal string8 str8_from_u64(arena *a, u64 value, u32 radix, u8 min_digits, u8 digit_group_separator) {
@@ -262,5 +315,77 @@ internal string8 str8_from_u64(arena *a, u64 value, u32 radix, u8 min_digits, u8
             memcpy(result.str, prefix.str, prefix.size);
         }
     }
+    return result;
+}
+
+internal string8node *str8_list_push_node_set_string(string8list *list, string8node *node, string8 string) {
+    SLL_QUEUE_PUSH(list->first, list->last, node);
+    ++list->node_count;
+    list->total_size += string.size;
+    node->string = string;
+    return node;
+}
+
+internal string8node *str8_list_push(arena *a, string8list *list, string8 string) {
+    string8node *node = push_array_no_zero(a, string8node, 1);
+    str8_list_push_node_set_string(list, node, string);
+    return node;
+}
+
+internal string8list str8_split(arena *a, string8 string, u8 *split_chars, u64 split_char_count,
+                                string_split_flags flags) {
+    string8list list = {0};
+    b32 keep_empties = (flags & STRING_SPLIT_FLAGS_KEEP_EMPTY);
+    u8 *ptr = string.str;
+    u8 *opl = string.str + string.size;
+    for (; ptr < opl;) {
+        u8 *first = ptr;
+        for (; ptr < opl; ++ptr) {
+            u8 c = *ptr;
+            b32 is_split = 0;
+            for (u64 i = 0; i < split_char_count; ++i) {
+                if (split_chars[i] == c) {
+                    is_split = 1;
+                    break;
+                }
+            }
+            if (is_split) {
+                break;
+            }
+        }
+        string8 string = str8_range(first, ptr);
+        if (keep_empties || string.size > 0) {
+            str8_list_push(a, &list, string);
+        }
+        ++ptr;
+    }
+    return list;
+}
+
+internal string8 str8_list_join(arena *a, string8list *list, string_join *optional_params) {
+    string_join join = {{0}};
+    if (optional_params != 0) {
+        memcpy(&join, optional_params, sizeof(join));
+    }
+    u64 sep_count = 0;
+    if (list->node_count > 0) {
+        sep_count = list->node_count - 1;
+    }
+    string8 result;
+    result.size = join.pre.size + join.post.size + sep_count * join.sep.size + list->total_size;
+    u8 *ptr = result.str = push_array_no_zero(a, u8, result.size + 1);
+    memcpy(ptr, join.pre.str, join.pre.size);
+    ptr += join.pre.size;
+    for (string8node *node = list->first; node != 0; node = node->next) {
+        memcpy(ptr, node->string.str, node->string.size);
+        ptr += node->string.size;
+        if (node->next != 0) {
+            memcpy(ptr, join.sep.str, join.sep.size);
+            ptr += join.sep.size;
+        }
+    }
+    memcpy(ptr, join.post.str, join.post.size);
+    ptr += join.post.size;
+    *ptr = 0;
     return result;
 }

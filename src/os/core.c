@@ -1,3 +1,12 @@
+internal string8list os_string_list_from_argcv(arena *a, int argc, char **argv) {
+    string8list result = {0};
+    for (int i = 0; i < argc; ++i) {
+        string8 str = str8_cstring(argv[i]);
+        str8_list_push(a, &result, str);
+    }
+    return result;
+}
+
 internal string8 os_data_from_file_path(arena *a, string8 path) {
     os_handle file = os_file_open(O_RDONLY, path);
     file_properties props = os_properties_from_file(file);
@@ -335,7 +344,9 @@ int main(int argc, char **argv) {
     g_arena = arena_alloc((arena_params){.flags = arena_default_flags,
                                          .reserve_size = arena_default_reserve_size,
                                          .commit_size = arena_default_commit_size});
-    int result = entry_point(argc, argv);
+    string8list command_line_argument_strings = os_string_list_from_argcv(g_arena, argc, argv);
+    cmd_line parsed = cmd_line_from_string_list(g_arena, command_line_argument_strings);
+    int result = entry_point(&parsed);
     arena_release(g_arena);
     return result;
 }

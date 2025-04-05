@@ -4,7 +4,7 @@ Moochrss queries RSS feeds and downloads torrents automatically.
 
 Usage:
 
-    moochrss [-t top results] [-f filter] [-c category] [-u user] [-s sort] [-o order] query
+    moochrss [-t top results] [-f filter] [-c category] [-u user] [-s sort] [-o order] <-q query>
 
 Moochrss queries torrents matching the specified criteria and adds them
 to a [libtorrent](https://www.libtorrent.org/index.html) session.
@@ -28,3 +28,9 @@ setting sorts by date.
 The -o flag sets the sorting order. The order can be set to
 ascending (asc) or descending (desc). The default setting does not set
 an order.
+
+The -q flag sets the query. This is a required argument.
+
+Example:
+
+    moochrss -t='5' -f='1' -c='1_2' -u='user 1' -s='downloads' -o='desc' -q='One Piece'

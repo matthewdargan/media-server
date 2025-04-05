@@ -17,6 +17,7 @@ typedef struct timespec timespec;
 global os_system_info os_info = {0};
 global arena *g_arena = {0};
 
+internal string8list os_string_list_from_argcv(arena *a, int argc, char **argv);
 internal string8 os_data_from_file_path(arena *a, string8 path);
 internal b32 os_write_data_to_file_path(string8 path, string8 data);
 internal b32 os_append_data_to_file_path(string8 path, string8 data);
@@ -51,6 +52,6 @@ internal date_time os_universal_time_from_local(date_time dt);
 internal date_time os_local_time_from_universal(date_time dt);
 internal void os_sleep_milliseconds(u32 msec);
 
-internal int entry_point(int argc, char **argv);
+internal int entry_point(cmd_line *cmd_line);
 
 #endif  // OS_CORE_H

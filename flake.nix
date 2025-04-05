@@ -50,7 +50,7 @@
             nativeBuildInputs = [pkgs.pkg-config];
             pname = "mooch";
             src = ./.;
-            version = "0.5.6";
+            version = "0.6.0";
           };
           moochrss = pkgs.clangStdenv.mkDerivation {
             buildInputs = [
@@ -74,7 +74,7 @@
             nativeBuildInputs = [pkgs.pkg-config];
             pname = "moochrss";
             src = ./.;
-            version = "0.2.0";
+            version = "0.3.0";
           };
         };
         pre-commit = {

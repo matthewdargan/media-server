@@ -31,6 +31,16 @@
 #define GLUE_(a, b) a##b
 #define GLUE(a, b) GLUE_(a, b)
 #define STATIC_ASSERT(c, id) global u8 GLUE(id, __LINE__)[(c) ? 1 : -1]
+
+#define CHECK_NIL(nil, p) ((p) == 0 || (p) == nil)
+#define SET_NIL(nil, p) ((p) = nil)
+
+#define SLL_QUEUE_PUSH_NZ(nil, f, l, n, next)                       \
+    (CHECK_NIL(nil, f) ? ((f) = (l) = (n), SET_NIL(nil, (n)->next)) \
+                       : ((l)->next = (n), (l) = (n), SET_NIL(nil, (n)->next)))
+
+#define SLL_QUEUE_PUSH(f, l, n) SLL_QUEUE_PUSH_NZ(0, f, l, n, next)
+
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 #define SWAP(T, a, b) \
     do {              \

@@ -18,7 +18,7 @@
 #include "os/inc.c"
 // clang-format on
 
-int entry_point(int argc, char **argv) {
+int entry_point(cmd_line *cmd_line) {
     temp scratch = temp_begin(g_arena);
     temp_end(scratch);
     return 0;

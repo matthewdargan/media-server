@@ -20,7 +20,7 @@
 typedef struct params params;
 struct params {
     u64 top_results;
-    u8 filter;
+    string8 filter;
     string8 category;
     string8 user;
     string8 sort;
@@ -39,14 +39,7 @@ struct torrent_array {
     torrent *v;
 };
 
-internal void usage(void) {
-    fprintf(stderr,
-            "usage: moochrss [-f filter] [-c category] [-u user] [-s sort] "
-            "[-o order] query\n");
-    exit(2);
-}
-
-read_only global u8 filters[] = {'0', '1', '2'};
+read_only global string8 filters[] = {str8_lit("0"), str8_lit("1"), str8_lit("2")};
 read_only global string8 categories[] = {
     str8_lit("0_0"), str8_lit("1_0"), str8_lit("1_1"), str8_lit("1_2"), str8_lit("1_3"), str8_lit("1_4"),
     str8_lit("2_0"), str8_lit("2_1"), str8_lit("2_2"), str8_lit("3_0"), str8_lit("3_1"), str8_lit("3_2"),
@@ -60,19 +53,23 @@ read_only global string8 sorts[] = {
 read_only global string8 orders[] = {str8_lit("asc"), str8_lit("desc")};
 
 internal b32 validate_params(params ps) {
+    if (ps.query.size == 0) {
+        fprintf(stderr, "query is required\n");
+        return 0;
+    }
     if (ps.top_results <= 0 || ps.top_results > MAX_TORRENTS) {
         fprintf(stderr, "invalid top results: %lu\n", ps.top_results);
         return 0;
     }
     b32 filter_valid = 0;
     for (u64 i = 0; i < ARRAY_COUNT(filters); ++i) {
-        if (ps.filter == filters[i]) {
+        if (str8_match(ps.filter, filters[i], 0)) {
             filter_valid = 1;
             break;
         }
     }
     if (!filter_valid) {
-        fprintf(stderr, "invalid filter: %c\n", ps.filter);
+        fprintf(stderr, "invalid filter: %s\n", ps.filter.str);
         return 0;
     }
     b32 category_valid = 0;
@@ -154,7 +151,7 @@ internal torrent_array get_torrents(arena *a, params ps) {
     if (ps.user.size > 0) {
         user = push_str8_cat(a, str8_lit("&u="), ps.user);
     }
-    string8 query = push_str8f(a, (char *)"&f=%c&c=%s&q=%s", ps.filter, ps.category.str, encoded_query.str);
+    string8 query = push_str8f(a, (char *)"&f=%s&c=%s&q=%s", ps.filter.str, ps.category.str, encoded_query.str);
     string8 sort = str8_zero();
     if (ps.sort.size > 0) {
         sort = push_str8_cat(a, str8_lit("&s="), ps.sort);
@@ -372,41 +369,37 @@ internal void *arena_calloc_callback(u64 nmemb, u64 size) {
     return ptr;
 }
 
-int entry_point(int argc, char **argv) {
+int entry_point(cmd_line *cmd_line) {
     temp scratch = temp_begin(g_arena);
     params ps = {
         .top_results = MAX_TORRENTS,
-        .filter = '0',
+        .filter = str8_lit("0"),
         .category = str8_lit("0_0"),
     };
-    for (int ch = 0; (ch = getopt(argc, argv, "t:f:c:u:s:o:")) != -1;) {
-        switch (ch) {
-            case 't':
-                ps.top_results = u64_from_str8(str8_cstring(optarg), 10);
-                break;
-            case 'f':
-                ps.filter = optarg[0];
-                break;
-            case 'c':
-                ps.category = push_str8_copy(scratch.a, str8_cstring(optarg));
-                break;
-            case 'u':
-                ps.user = push_str8_copy(scratch.a, str8_cstring(optarg));
-                break;
-            case 's':
-                ps.sort = push_str8_copy(scratch.a, str8_cstring(optarg));
-                break;
-            case 'o':
-                ps.order = push_str8_copy(scratch.a, str8_cstring(optarg));
-                break;
-            default:
-                usage();
-        }
+    if (cmd_line_has_argument(cmd_line, str8_lit("t"))) {
+        u64 top_results = 0;
+        string8 top_results_string = cmd_line_string(cmd_line, str8_lit("t"));
+        try_u64_from_str8_c_rules(top_results_string, &top_results);
+        ps.top_results = top_results;
     }
-    if (optind >= argc) {
-        usage();
+    if (cmd_line_has_argument(cmd_line, str8_lit("f"))) {
+        ps.filter = cmd_line_string(cmd_line, str8_lit("f"));
     }
-    ps.query = push_str8_copy(scratch.a, str8_cstring(argv[optind]));
+    if (cmd_line_has_argument(cmd_line, str8_lit("c"))) {
+        ps.category = cmd_line_string(cmd_line, str8_lit("c"));
+    }
+    if (cmd_line_has_argument(cmd_line, str8_lit("u"))) {
+        ps.user = cmd_line_string(cmd_line, str8_lit("u"));
+    }
+    if (cmd_line_has_argument(cmd_line, str8_lit("s"))) {
+        ps.sort = cmd_line_string(cmd_line, str8_lit("s"));
+    }
+    if (cmd_line_has_argument(cmd_line, str8_lit("o"))) {
+        ps.order = cmd_line_string(cmd_line, str8_lit("o"));
+    }
+    if (cmd_line_has_argument(cmd_line, str8_lit("q"))) {
+        ps.query = cmd_line_string(cmd_line, str8_lit("q"));
+    }
     if (!validate_params(ps)) {
         return 1;
     }
