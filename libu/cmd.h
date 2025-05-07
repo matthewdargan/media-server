@@ -40,4 +40,4 @@ static String8 cmd_str(Cmd *c, String8 name);
 static b32 cmd_has_flag(Cmd *c, String8 name);
 static b32 cmd_has_arg(Cmd *c, String8 name);
 
-#endif  // CMD_H
+#endif /* CMD_H */

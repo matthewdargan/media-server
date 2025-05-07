@@ -33,13 +33,11 @@ struct Rng1U64 {
 	u64 max;
 };
 
-typedef u32 StringCmpFlags;
 enum {
 	STRING_CMP_FLAGS_CASE_INSENSITIVE = 1 << 0,
 	STRING_CMP_FLAGS_RIGHT_SIDE_SLOPPY = 1 << 1,
 };
 
-typedef u32 StringSplitFlags;
 enum {
 	STRING_SPLIT_FLAGS_KEEP_EMPTY = 1 << 0,
 };
@@ -85,9 +83,9 @@ static String8 str8_zero(void);
 static String8 str8_cstr(char *c);
 static Rng1U64 rng1u64(u64 min, u64 max);
 static u64 dim1u64(Rng1U64 r);
-static b32 str8_cmp(String8 a, String8 b, StringCmpFlags flags);
-static u64 str8_index(String8 s, u64 start_pos, String8 needle, StringCmpFlags flags);
-static u64 str8_rindex(String8 s, u64 start_pos, String8 needle, StringCmpFlags flags);
+static b32 str8_cmp(String8 a, String8 b, u32 flags);
+static u64 str8_index(String8 s, u64 start_pos, String8 needle, u32 flags);
+static u64 str8_rindex(String8 s, u64 start_pos, String8 needle, u32 flags);
 static String8 str8_substr(String8 s, Rng1U64 r);
 static String8 str8_prefix(String8 s, u64 len);
 static String8 str8_suffix(String8 s, u64 len);
@@ -101,7 +99,7 @@ static u64 str8_to_u64(String8 s, u32 radix);
 static b32 str8_to_u64_ok(String8 s, u64 *x);
 static String8 u64_to_str8(Arena *a, u64 v, u32 radix, u8 min_digits, u8 digit_sep);
 static String8Node *str8_list_push(Arena *a, String8List *list, String8 s);
-static String8List str8_split(Arena *a, String8 s, u8 *split, u64 split_len, StringSplitFlags flags);
+static String8List str8_split(Arena *a, String8 s, u8 *split, u64 split_len, u32 flags);
 static String8 str8_list_join(Arena *a, String8List *list, StringJoin *opts);
 static String8Array str8_list_to_array(Arena *a, String8List *list);
 static String8Array str8_array_reserve(Arena *a, u64 cnt);
@@ -110,4 +108,4 @@ static String8 str8_basename(String8 s);
 static String8 str8_prefix_ext(String8 s);
 static String8 str8_ext(String8 s);
 
-#endif  // STRING_H
+#endif /* STRING_H */

@@ -1,8 +1,9 @@
 static DenseTime
 date_time_to_dense_time(DateTime dt)
 {
-	DenseTime t = 0;
-	t += dt.year;
+	DenseTime t;
+
+	t = dt.year;
 	t *= 12;
 	t += dt.mon;
 	t *= 31;
@@ -21,7 +22,8 @@ date_time_to_dense_time(DateTime dt)
 static DateTime
 dense_time_to_date_time(DenseTime t)
 {
-	DateTime dt = {0};
+	DateTime dt;
+
 	dt.msec = t % 1000;
 	t /= 1000;
 	dt.sec = t % 61;
@@ -35,6 +37,6 @@ dense_time_to_date_time(DenseTime t)
 	dt.mon = t % 12;
 	t /= 12;
 	ASSERT(t <= max_u32);
-	dt.year = (u32)t;
+	dt.year = t;
 	return dt;
 }

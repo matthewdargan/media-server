@@ -75,19 +75,17 @@ static s8 min_s8 = (s8)0xff;
 
 typedef struct DateTime DateTime;
 struct DateTime {
-	u16 micro_sec;  // [0,999]
-	u16 msec;       // [0,999]
-	u16 sec;        // [0,60]
-	u16 min;        // [0,59]
-	u16 hour;       // [0,24]
-	u16 day;        // [0,30]
+	u16 msec; /* [0,999] */
+	u16 sec;  /* [0,60] */
+	u16 min;  /* [0,59] */
+	u16 hour; /* [0,24] */
+	u16 day;  /* [0,30] */
 	u32 mon;
-	u32 year;  // 1 = 1 CE, 0 = 1 BC
+	u32 year; /* 1 = 1 CE, 0 = 1 BC */
 };
 
 typedef u64 DenseTime;
 
-typedef u32 FilePropertyFlags;
 enum {
 	FILE_PROPERTY_FLAG_IS_DIR = (1 << 0),
 };
@@ -97,10 +95,10 @@ struct FileProperties {
 	u64 size;
 	u64 modified;
 	u64 created;
-	FilePropertyFlags flags;
+	u32 flags;
 };
 
 static DenseTime date_time_to_dense_time(DateTime dt);
 static DateTime dense_time_to_date_time(DenseTime t);
 
-#endif  // CORE_H
+#endif /* CORE_H */

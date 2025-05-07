@@ -11,7 +11,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-// clang-format off
+/* clang-format off */
 #include "libu/u.h"
 #include "libu/arena.h"
 #include "libu/string.h"
@@ -22,7 +22,7 @@
 #include "libu/string.c"
 #include "libu/cmd.c"
 #include "libu/os.c"
-// clang-format on
+/* clang-format on */
 
 #define CHUNK_SIZE MB(1)
 #define RESULTS_PER_PAGE 75
@@ -66,43 +66,40 @@ read_only static String8 orders[] = {str8_lit_comp("asc"), str8_lit_comp("desc")
 static b32
 valid_params(Params ps)
 {
+	b32 filter_ok, category_ok, sort_ok, order_ok;
+	u64 i;
+
 	if (ps.query.len == 0) {
 		fprintf(stderr, "query is required\n");
 		return 0;
 	}
-	b32 filter_valid = 0;
-	b32 category_valid = 0;
-	b32 sort_valid = 0;
-	b32 order_valid = 0;
-	for (u64 i = 0; i < ARRAY_COUNT(filters); ++i) {
-		filter_valid |= str8_cmp(ps.filter, filters[i], 0);
-	}
-	for (u64 i = 0; i < ARRAY_COUNT(categories); ++i) {
-		category_valid |= str8_cmp(ps.category, categories[i], 0);
-	}
-	if (ps.sort.len > 0) {
-		for (u64 i = 0; i < ARRAY_COUNT(sorts); ++i) {
-			sort_valid |= str8_cmp(ps.sort, sorts[i], 0);
-		}
-	}
-	if (ps.order.len > 0) {
-		for (u64 i = 0; i < ARRAY_COUNT(orders); ++i) {
-			order_valid |= str8_cmp(ps.order, orders[i], 0);
-		}
-	}
-	if (!filter_valid) {
+	filter_ok = 0;
+	category_ok = 0;
+	sort_ok = 0;
+	order_ok = 0;
+	for (i = 0; i < ARRAY_COUNT(filters); i++)
+		filter_ok |= str8_cmp(ps.filter, filters[i], 0);
+	for (i = 0; i < ARRAY_COUNT(categories); i++)
+		category_ok |= str8_cmp(ps.category, categories[i], 0);
+	if (ps.sort.len > 0)
+		for (i = 0; i < ARRAY_COUNT(sorts); i++)
+			sort_ok |= str8_cmp(ps.sort, sorts[i], 0);
+	if (ps.order.len > 0)
+		for (i = 0; i < ARRAY_COUNT(orders); i++)
+			order_ok |= str8_cmp(ps.order, orders[i], 0);
+	if (!filter_ok) {
 		fprintf(stderr, "invalid filter: %s\n", (char *)ps.filter.str);
 		return 0;
 	}
-	if (!category_valid) {
+	if (!category_ok) {
 		fprintf(stderr, "invalid category: %s\n", (char *)ps.category.str);
 		return 0;
 	}
-	if (ps.sort.len > 0 && !sort_valid) {
+	if (ps.sort.len > 0 && !sort_ok) {
 		fprintf(stderr, "invalid sort: %s\n", (char *)ps.sort.str);
 		return 0;
 	}
-	if (ps.order.len > 0 && !order_valid) {
+	if (ps.order.len > 0 && !order_ok) {
 		fprintf(stderr, "invalid order: %s\n", (char *)ps.order.str);
 		return 0;
 	}
@@ -112,8 +109,11 @@ valid_params(Params ps)
 static size_t
 write_callback(void *contents, size_t size, size_t nmemb, void *userp)
 {
-	u64 real_size = size * nmemb;
-	String8 *chunk = (String8 *)userp;
+	u64 real_size;
+	String8 *chunk;
+
+	real_size = size * nmemb;
+	chunk = (String8 *)userp;
 	if (chunk->len + real_size + 1 > CHUNK_SIZE) {
 		fprintf(stderr, "tor: HTTP response too large for chunk\n");
 		return 0;
@@ -127,28 +127,33 @@ write_callback(void *contents, size_t size, size_t nmemb, void *userp)
 static u64
 get_total_pages(htmlDocPtr doc, xmlXPathCompExprPtr expr)
 {
-	xmlXPathContextPtr ctx = xmlXPathNewContext(doc);
+	xmlXPathContextPtr ctx;
+	xmlXPathObjectPtr res;
+	xmlNodePtr node;
+	xmlChar *data;
+	String8 s, of, space, total_str;
+	u64 of_pos, num_pos, space_pos, total;
+
+	ctx = xmlXPathNewContext(doc);
 	if (ctx == NULL) {
 		fprintf(stderr, "tor: unable to create XPath context\n");
 		return 1;
 	}
-	xmlXPathObjectPtr res = xmlXPathCompiledEval(expr, ctx);
-	if (res == NULL || xmlXPathNodeSetIsEmpty(res->nodesetval)) {
+	res = xmlXPathCompiledEval(expr, ctx);
+	if (res == NULL || xmlXPathNodeSetIsEmpty(res->nodesetval))
 		return 1;
-	}
-	xmlNodePtr node = res->nodesetval->nodeTab[0];
-	xmlChar *data = xmlNodeGetContent(node);
-	String8 s = str8((u8 *)data, xmlStrlen(data));
-	String8 of = str8_lit("of ");
-	String8 space = str8_lit(" ");
-	u64 of_pos = str8_index(s, 0, of, 0);
-	u64 num_pos = of_pos + of.len;
-	u64 space_pos = str8_index(s, num_pos, space, 0);
-	if (num_pos >= s.len || space_pos >= s.len) {
+	node = res->nodesetval->nodeTab[0];
+	data = xmlNodeGetContent(node);
+	s = str8(data, xmlStrlen(data));
+	of = str8_lit("of ");
+	space = str8_lit(" ");
+	of_pos = str8_index(s, 0, of, 0);
+	num_pos = of_pos + of.len;
+	space_pos = str8_index(s, num_pos, space, 0);
+	if (num_pos >= s.len || space_pos >= s.len)
 		return 1;
-	}
-	String8 total_str = str8_substr(s, rng1u64(num_pos, space_pos));
-	u64 total = str8_to_u64(total_str, 10);
+	total_str = str8_substr(s, rng1u64(num_pos, space_pos));
+	total = str8_to_u64(total_str, 10);
 	return (total + RESULTS_PER_PAGE - 1) / RESULTS_PER_PAGE;
 }
 
@@ -156,29 +161,36 @@ static TorrentArray
 extract_torrents(Arena *a, htmlDocPtr doc, xmlXPathCompExprPtr row_expr, xmlXPathCompExprPtr title_expr,
                  xmlXPathCompExprPtr magnet_expr)
 {
-	TorrentArray torrents = {0};
-	xmlXPathContextPtr ctx = xmlXPathNewContext(doc);
+	TorrentArray torrents;
+	xmlXPathContextPtr ctx;
+	xmlXPathObjectPtr res;
+	u64 i;
+	xmlNodePtr row, title_node, magnet_node;
+	xmlXPathObjectPtr title_res, magnet_res;
+	xmlChar *title, *magnet_path;
+
+	memset(&torrents, 0, sizeof(TorrentArray));
+	ctx = xmlXPathNewContext(doc);
 	if (ctx == NULL) {
 		fprintf(stderr, "tor: unable to create XPath context\n");
 		return torrents;
 	}
-	xmlXPathObjectPtr res = xmlXPathCompiledEval(row_expr, ctx);
-	if (res == NULL || xmlXPathNodeSetIsEmpty(res->nodesetval)) {
+	res = xmlXPathCompiledEval(row_expr, ctx);
+	if (res == NULL || xmlXPathNodeSetIsEmpty(res->nodesetval))
 		return torrents;
-	}
 	torrents.cnt = res->nodesetval->nodeNr;
 	torrents.v = push_array_no_zero(a, Torrent, torrents.cnt);
-	for (u64 i = 0; i < torrents.cnt; ++i) {
-		xmlNodePtr row = res->nodesetval->nodeTab[i];
+	for (i = 0; i < torrents.cnt; i++) {
+		row = res->nodesetval->nodeTab[i];
 		ctx->node = row;
-		xmlXPathObjectPtr title_res = xmlXPathCompiledEval(title_expr, ctx);
-		xmlXPathObjectPtr magnet_res = xmlXPathCompiledEval(magnet_expr, ctx);
+		title_res = xmlXPathCompiledEval(title_expr, ctx);
+		magnet_res = xmlXPathCompiledEval(magnet_expr, ctx);
 		if (title_res && !xmlXPathNodeSetIsEmpty(title_res->nodesetval) && magnet_res &&
 		    !xmlXPathNodeSetIsEmpty(magnet_res->nodesetval)) {
-			xmlNodePtr title_node = title_res->nodesetval->nodeTab[0];
-			xmlNodePtr magnet_node = magnet_res->nodesetval->nodeTab[0];
-			xmlChar *title = xmlNodeGetContent(title_node);
-			xmlChar *magnet_path = xmlNodeGetContent(magnet_node);
+			title_node = title_res->nodesetval->nodeTab[0];
+			magnet_node = magnet_res->nodesetval->nodeTab[0];
+			title = xmlNodeGetContent(title_node);
+			magnet_path = xmlNodeGetContent(magnet_node);
 			torrents.v[i].title = push_str8_copy(a, str8((u8 *)title, xmlStrlen(title)));
 			torrents.v[i].magnet = push_str8_copy(a, str8((u8 *)magnet_path, xmlStrlen(magnet_path)));
 		}
@@ -189,56 +201,64 @@ extract_torrents(Arena *a, htmlDocPtr doc, xmlXPathCompExprPtr row_expr, xmlXPat
 static TorrentArray
 get_torrents(Arena *a, Params ps)
 {
-	TorrentArray torrents = {0};
-	xmlXPathCompExprPtr pagination_expr = xmlXPathCompile(BAD_CAST "//div[@class='pagination-page-info']");
-	xmlXPathCompExprPtr row_expr = xmlXPathCompile(BAD_CAST "//table/tbody/tr");
-	xmlXPathCompExprPtr title_expr = xmlXPathCompile(BAD_CAST "./td[2]/a[last()]");
-	xmlXPathCompExprPtr magnet_expr = xmlXPathCompile(BAD_CAST "./td[3]/a[2]/@href");
-	CURL *curl = curl_easy_init();
+	TorrentArray torrents, page_torrents;
+	xmlXPathCompExprPtr pagination_expr, row_expr, title_expr, magnet_expr;
+	CURL *curl;
+	char *curl_encoded_query;
+	String8 chunk, encoded_query, base_url, user, query, sort, order, url, query_url;
+	u64 page, total_pages;
+	CURLcode res;
+	long http_code;
+	htmlDocPtr doc;
+
+	memset(&torrents, 0, sizeof(TorrentArray));
+	pagination_expr = xmlXPathCompile(BAD_CAST "//div[@class='pagination-page-info']");
+	row_expr = xmlXPathCompile(BAD_CAST "//table/tbody/tr");
+	title_expr = xmlXPathCompile(BAD_CAST "./td[2]/a[last()]");
+	magnet_expr = xmlXPathCompile(BAD_CAST "./td[3]/a[2]/@href");
+	curl = curl_easy_init();
 	if (curl == NULL) {
 		fprintf(stderr, "tor: could not initialize curl\n");
 		return torrents;
 	}
-	char *curl_encoded_query = curl_easy_escape(curl, (const char *)ps.query.str, ps.query.len);
+	curl_encoded_query = curl_easy_escape(curl, (const char *)ps.query.str, ps.query.len);
 	if (curl_encoded_query == NULL) {
 		fprintf(stderr, "tor: could not URL encode query\n");
 		curl_easy_cleanup(curl);
 		return torrents;
 	}
-	String8 chunk = {
-	    .str = push_array_no_zero(a, u8, CHUNK_SIZE),
-	    .len = 0,
-	};
+	chunk.str = push_array_no_zero(a, u8, CHUNK_SIZE);
+	chunk.len = 0;
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
 	curl_easy_setopt(curl, CURLOPT_USERAGENT, "tor/1.0");
-	String8 encoded_query = push_str8_copy(a, str8_cstr(curl_encoded_query));
-	String8 base_url = str8_lit("https://nyaa.si");
-	String8 user = ps.user.len > 0 ? push_str8_cat(a, str8_lit("/user/"), ps.user) : str8_zero();
-	String8 query = push_str8f(a, (char *)"?f=%s&c=%s&q=%s", ps.filter.str, ps.category.str, encoded_query.str);
-	String8 sort = ps.sort.len > 0 ? push_str8_cat(a, str8_lit("&s="), ps.sort) : str8_zero();
-	String8 order = ps.order.len > 0 ? push_str8_cat(a, str8_lit("&o="), ps.order) : str8_zero();
-	String8 url = push_str8_cat(a, base_url, user);
+	encoded_query = push_str8_copy(a, str8_cstr(curl_encoded_query));
+	base_url = str8_lit("https://nyaa.si");
+	user = ps.user.len > 0 ? push_str8_cat(a, str8_lit("/user/"), ps.user) : str8_zero();
+	query = push_str8f(a, (char *)"?f=%s&c=%s&q=%s", ps.filter.str, ps.category.str, encoded_query.str);
+	sort = ps.sort.len > 0 ? push_str8_cat(a, str8_lit("&s="), ps.sort) : str8_zero();
+	order = ps.order.len > 0 ? push_str8_cat(a, str8_lit("&o="), ps.order) : str8_zero();
+	url = push_str8_cat(a, base_url, user);
 	url = push_str8_cat(a, url, query);
 	url = push_str8_cat(a, url, sort);
 	url = push_str8_cat(a, url, order);
-	for (u64 page = 1, total_pages = 1; page <= total_pages; ++page) {
-		String8 query_url = push_str8f(a, (char *)"%s&p=%ld", url.str, page);
+	for (page = 1, total_pages = 1; page <= total_pages; page++) {
+		query_url = push_str8f(a, (char *)"%s&p=%ld", url.str, page);
 		chunk.len = 0;
 		curl_easy_setopt(curl, CURLOPT_URL, query_url.str);
-		CURLcode res = curl_easy_perform(curl);
+		res = curl_easy_perform(curl);
 		if (res != CURLE_OK) {
 			fprintf(stderr, "tor: curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
 			continue;
 		}
-		long http_code = 0;
+		http_code = 0;
 		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 		if (http_code != 200) {
 			fprintf(stderr, "tor: HTTP error %ld for page %lu\n", http_code, page);
 			continue;
 		}
-		htmlDocPtr doc = htmlReadMemory((const char *)chunk.str, chunk.len, (const char *)query_url.str, NULL,
-		                                HTML_PARSE_NOWARNING | HTML_PARSE_NOERROR);
+		doc = htmlReadMemory((const char *)chunk.str, chunk.len, (const char *)query_url.str, NULL,
+		                     HTML_PARSE_NOWARNING | HTML_PARSE_NOERROR);
 		if (doc == NULL) {
 			fprintf(stderr, "tor: failed to parse HTML for page %lu\n", page);
 			continue;
@@ -247,7 +267,7 @@ get_torrents(Arena *a, Params ps)
 			total_pages = get_total_pages(doc, pagination_expr);
 			torrents.v = push_array_no_zero(a, Torrent, total_pages * RESULTS_PER_PAGE);
 		}
-		TorrentArray page_torrents = extract_torrents(a, doc, row_expr, title_expr, magnet_expr);
+		page_torrents = extract_torrents(a, doc, row_expr, title_expr, magnet_expr);
 		if (page_torrents.cnt > 0) {
 			memcpy(torrents.v + torrents.cnt, page_torrents.v, sizeof(Torrent) * page_torrents.cnt);
 			torrents.cnt += page_torrents.cnt;
@@ -271,13 +291,13 @@ arena_free_callback(void *)
 static void *
 arena_realloc_callback(void *p, u64 size)
 {
-	if (p == NULL) {
+	u8 *new_p;
+
+	if (p == NULL)
 		return arena_malloc_callback(size);
-	}
-	if (size == 0) {
+	if (size == 0)
 		return NULL;
-	}
-	u8 *new_p = push_array_no_zero(arena, u8, size);
+	new_p = push_array_no_zero(arena, u8, size);
 	memmove(new_p, p, size);
 	return new_p;
 }
@@ -285,8 +305,11 @@ arena_realloc_callback(void *p, u64 size)
 static char *
 arena_strdup_callback(const char *s)
 {
-	u64 len = cstr8_len((u8 *)s);
-	u8 *dup = push_array_no_zero(arena, u8, len + 1);
+	u64 len;
+	u8 *dup;
+
+	len = cstr8_len((u8 *)s);
+	dup = push_array_no_zero(arena, u8, len + 1);
 	memcpy(dup, s, len);
 	dup[len] = 0;
 	return (char *)dup;
@@ -295,16 +318,20 @@ arena_strdup_callback(const char *s)
 static void *
 arena_calloc_callback(u64 nmemb, u64 size)
 {
-	u64 total_size = nmemb * size;
-	u8 *p = push_array(arena, u8, total_size);
+	u64 total_size;
+	u8 *p;
+
+	total_size = nmemb * size;
+	p = push_array(arena, u8, total_size);
 	return p;
 }
 
 int
 main(int argc, char *argv[])
 {
-	sys_info.nprocs = (u32)sysconf(_SC_NPROCESSORS_ONLN);
-	sys_info.page_size = (u64)sysconf(_SC_PAGESIZE);
+	// TODO: finish this up
+	sys_info.nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+	sys_info.page_size = sysconf(_SC_PAGESIZE);
 	sys_info.large_page_size = MB(2);
 	arena = arena_alloc((ArenaParams){
 	    .flags = arena_default_flags, .res_size = arena_default_res_size, .cmt_size = arena_default_cmt_size});
@@ -318,24 +345,18 @@ main(int argc, char *argv[])
 	String8 sort = str8_zero();
 	String8 order = str8_zero();
 	String8 query = str8_zero();
-	if (cmd_has_arg(&parsed, str8_lit("f"))) {
+	if (cmd_has_arg(&parsed, str8_lit("f")))
 		filter = cmd_str(&parsed, str8_lit("f"));
-	}
-	if (cmd_has_arg(&parsed, str8_lit("c"))) {
+	if (cmd_has_arg(&parsed, str8_lit("c")))
 		category = cmd_str(&parsed, str8_lit("c"));
-	}
-	if (cmd_has_arg(&parsed, str8_lit("u"))) {
+	if (cmd_has_arg(&parsed, str8_lit("u")))
 		user = cmd_str(&parsed, str8_lit("u"));
-	}
-	if (cmd_has_arg(&parsed, str8_lit("s"))) {
+	if (cmd_has_arg(&parsed, str8_lit("s")))
 		sort = cmd_str(&parsed, str8_lit("s"));
-	}
-	if (cmd_has_arg(&parsed, str8_lit("o"))) {
+	if (cmd_has_arg(&parsed, str8_lit("o")))
 		order = cmd_str(&parsed, str8_lit("o"));
-	}
-	if (cmd_has_arg(&parsed, str8_lit("q"))) {
+	if (cmd_has_arg(&parsed, str8_lit("q")))
 		query = cmd_str(&parsed, str8_lit("q"));
-	}
 	Params ps = {
 	    .filter = filter,
 	    .category = category,
@@ -363,7 +384,7 @@ main(int argc, char *argv[])
 		return 1;
 	}
 	String8 data = str8_zero();
-	for (u64 i = 0; i < torrents.cnt; ++i) {
+	for (u64 i = 0; i < torrents.cnt; i++) {
 		String8 line = push_str8f(scratch.a, (char *)"%s\t%s\n", torrents.v[i].title.str, torrents.v[i].magnet.str);
 		data = push_str8_cat(scratch.a, data, line);
 	}

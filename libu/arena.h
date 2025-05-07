@@ -3,21 +3,20 @@
 
 #define ARENA_HEADER_SIZE 128
 
-typedef u32 ArenaFlags;
 enum {
 	ARENA_FLAGS_LARGE_PAGES = (1 << 0),
 };
 
 typedef struct ArenaParams ArenaParams;
 struct ArenaParams {
-	ArenaFlags flags;
+	u32 flags;
 	u64 res_size;
 	u64 cmt_size;
 };
 
 typedef struct Arena Arena;
 struct Arena {
-	ArenaFlags flags;
+	u32 flags;
 	u64 res_size;
 	u64 cmt_size;
 	u64 base_pos;
@@ -33,7 +32,7 @@ struct Temp {
 	u64 pos;
 };
 
-static ArenaFlags arena_default_flags = 0;
+static u32 arena_default_flags = 0;
 static u64 arena_default_res_size = MB(64);
 static u64 arena_default_cmt_size = KB(64);
 
@@ -52,4 +51,4 @@ static void arena_pop(Arena *a, u64 size);
 static Temp temp_begin(Arena *a);
 static void temp_end(Temp t);
 
-#endif  // ARENA_H
+#endif /* ARENA_H */

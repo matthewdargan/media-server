@@ -8,7 +8,7 @@
 #include <libtorrent/session.hpp>
 #include <libtorrent/torrent_info.hpp>
 
-// clang-format off
+/* clang-format off */
 #include "libu/u.h"
 #include "libu/arena.h"
 #include "libu/string.h"
@@ -19,7 +19,7 @@
 #include "libu/string.c"
 #include "libu/cmd.c"
 #include "libu/os.c"
-// clang-format on
+/* clang-format on */
 
 #define CHUNK_SIZE MB(1)
 #define MAX_TORRENTS 75
@@ -63,19 +63,19 @@ valid_params(Params ps)
 	b32 category_valid = 0;
 	b32 sort_valid = 0;
 	b32 order_valid = 0;
-	for (u64 i = 0; i < ARRAY_COUNT(filters); ++i) {
+	for (u64 i = 0; i < ARRAY_COUNT(filters); i++) {
 		filter_valid |= str8_cmp(ps.filter, filters[i], 0);
 	}
-	for (u64 i = 0; i < ARRAY_COUNT(categories); ++i) {
+	for (u64 i = 0; i < ARRAY_COUNT(categories); i++) {
 		category_valid |= str8_cmp(ps.category, categories[i], 0);
 	}
 	if (ps.sort.len > 0) {
-		for (u64 i = 0; i < ARRAY_COUNT(sorts); ++i) {
+		for (u64 i = 0; i < ARRAY_COUNT(sorts); i++) {
 			sort_valid |= str8_cmp(ps.sort, sorts[i], 0);
 		}
 	}
 	if (ps.order.len > 0) {
-		for (u64 i = 0; i < ARRAY_COUNT(orders); ++i) {
+		for (u64 i = 0; i < ARRAY_COUNT(orders); i++) {
 			order_valid |= str8_cmp(ps.order, orders[i], 0);
 		}
 	}
@@ -178,7 +178,7 @@ get_torrents(Arena *a, Params ps)
 		return torrents;
 	}
 	torrents.cnt = MIN(ps.top_results, (u64)item_res->nodesetval->nodeNr);
-	for (u64 i = 0; i < torrents.cnt; ++i) {
+	for (u64 i = 0; i < torrents.cnt; i++) {
 		xmlNodePtr item = item_res->nodesetval->nodeTab[i];
 		context->node = item;
 		xmlXPathObjectPtr link_res = xmlXPathCompiledEval(link_expr, context);
@@ -221,7 +221,7 @@ download_torrents(Arena *a, String8Array torrents)
 	String8 temp_path = str8_lit("/tmp/torrss.torrent");
 	String8 torrents_to_download = str8_zero();
 	u64 to_download = 0;
-	for (u64 i = 0; i < torrents.cnt; ++i) {
+	for (u64 i = 0; i < torrents.cnt; i++) {
 		if (history_data.len > 0) {
 			if (str8_index(history_data, 0, torrents.v[i], 0) != history_data.len) {
 				fprintf(stderr, "torrss: already downloaded %s\n", torrents.v[i].str);
@@ -258,7 +258,7 @@ download_torrents(Arena *a, String8Array torrents)
 		session.add_torrent(ps);
 		String8 torrent_nl = push_str8_cat(a, torrents.v[i], str8_lit("\n"));
 		torrents_to_download = push_str8_cat(a, torrents_to_download, torrent_nl);
-		++to_download;
+		to_download++;
 	}
 	unlink((const char *)temp_path.str);
 	curl_easy_cleanup(curl);

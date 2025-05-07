@@ -5,7 +5,7 @@
 #include <libtorrent/magnet_uri.hpp>
 #include <libtorrent/session.hpp>
 
-// clang-format off
+/* clang-format off */
 #include "libu/u.h"
 #include "libu/arena.h"
 #include "libu/string.h"
@@ -16,14 +16,14 @@
 #include "libu/string.c"
 #include "libu/cmd.c"
 #include "libu/os.c"
-// clang-format on
+/* clang-format on */
 
 static String8Array
 parse_torrents(Arena *a, String8 data)
 {
 	String8Array torrents = {0};
 	u64 nlines = 0;
-	for (u64 i = 0; i < data.len; ++i) {
+	for (u64 i = 0; i < data.len; i++) {
 		nlines += (data.str[i] == '\n');
 	}
 	torrents.v = push_array_no_zero(a, String8, nlines);
@@ -34,7 +34,8 @@ parse_torrents(Arena *a, String8 data)
 		u64 tab_pos = str8_index(line, 0, str8_lit("\t"), 0);
 		if (tab_pos < line.len) {
 			String8 magnet = str8_substr(line, rng1u64(tab_pos + 1, line.len));
-			torrents.v[torrents.cnt++] = push_str8_copy(a, magnet);
+			torrents.v[torrents.cnt] = push_str8_copy(a, magnet);
+			torrents.cnt++;
 		}
 	}
 	return torrents;
@@ -50,7 +51,7 @@ download_torrents(String8Array torrents)
 	pack.set_int(libtorrent::settings_pack::alert_mask,
 	             libtorrent::alert::status_notification | libtorrent::alert::error_notification);
 	libtorrent::session session(pack);
-	for (u64 i = 0; i < torrents.cnt; ++i) {
+	for (u64 i = 0; i < torrents.cnt; i++) {
 		try {
 			libtorrent::add_torrent_params ps;
 			libtorrent::error_code ec;

@@ -11,15 +11,15 @@ struct SystemInfo {
 typedef struct tm tm;
 typedef struct timespec timespec;
 
-static SystemInfo sys_info = {0};
-static Arena *arena = {0};
+static SystemInfo sys_info;
+static Arena *arena;
 
 static String8List os_args(Arena *a, int argc, char **argv);
 static String8 os_read_file(Arena *a, String8 path);
 static b32 os_write_file(String8 path, String8 data);
 static b32 os_append_file(String8 path, String8 data);
 static String8 os_read_file_range(Arena *a, u64 fd, Rng1U64 r);
-static DateTime os_tm_to_datetime(tm in, u32 msec);
+static DateTime os_tm_to_datetime(tm t, u32 msec);
 static tm os_datetime_to_tm(DateTime dt);
 static timespec os_datetime_to_timespec(DateTime dt);
 static DenseTime os_timespec_to_densetime(timespec ts);
@@ -49,4 +49,4 @@ static DateTime os_local_to_utc(DateTime dt);
 static DateTime os_utc_to_local(DateTime dt);
 static void os_sleep_ms(u32 msec);
 
-#endif  // OS_CORE_H
+#endif /* OS_CORE_H */
